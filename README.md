@@ -4,9 +4,11 @@ A Python client for interacting with Kagenti AI agents via the Agent-to-Agent (A
 
 ## Features
 
-- **JSON-RPC 2.0 over HTTP(S)** - Standard protocol communication
+- **Kagenti A2A Protocol** - Compatible with Kagenti's Agent-to-Agent protocol format
+- **JSON-RPC 2.0 over HTTP(S)** - Standard protocol communication with structured messages
 - **Session Management** - Multi-turn conversation support with persistent context
 - **Synchronous Communication** - Request/response pattern for real-time interactions
+- **Structured Messages** - Support for multi-part messages with text and data content
 - **Error Handling** - Comprehensive error handling and validation
 - **Connection Management** - Automatic connection pooling and cleanup
 - **Security** - Authentication token support and input validation
@@ -24,15 +26,16 @@ pip install -e .
 from kagenti_a2a_client import SyncClient
 
 # Create client
-with SyncClient(agent_url="http://localhost:8080") as client:
+with SyncClient(agent_url="http://localhost:8000") as client:
     
     # Check agent health
     if client.health_check():
         print("Agent is healthy!")
     
     # Send message
-    response = client.send_message("Hello, how can you help me?")
+    response = client.send_message("convert $20 to euros")
     print(f"Agent response: {response.output}")
+    # Output: The current exchange rate from USD to EUR is 0.8661. Therefore, $20 is approximately €17.32.
 ```
 
 ## Usage Examples
@@ -43,11 +46,8 @@ with SyncClient(agent_url="http://localhost:8080") as client:
 from kagenti_a2a_client import SyncClient, SyncClientError
 
 try:
-    with SyncClient(agent_url="http://localhost:8080") as client:
-        response = client.send_message(
-            message="What can you do?",
-            output_mode="text"
-        )
+    with SyncClient(agent_url="http://localhost:8000") as client:
+        response = client.send_message("What can you do?")
         print(f"Status: {response.status}")
         print(f"Output: {response.output}")
         
@@ -60,7 +60,7 @@ except SyncClientError as e:
 ```python
 from kagenti_a2a_client import SyncClient
 
-with SyncClient(agent_url="http://localhost:8080") as client:
+with SyncClient(agent_url="http://localhost:8000") as client:
     
     # Create session for conversation context
     session = client.create_session()
@@ -103,7 +103,7 @@ client = SyncClient(
 from kagenti_a2a_client import SyncClient
 
 client = SyncClient(
-    agent_url="http://localhost:8080",
+    agent_url="http://localhost:8000",
     timeout=60.0,  # 60 seconds
     headers={
         "X-Custom-Header": "value",
@@ -111,6 +111,37 @@ client = SyncClient(
     }
 )
 ```
+
+## Protocol Compatibility
+
+This client implements the Kagenti A2A protocol format, sending messages in the structure expected by Kagenti agents:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "message/send",
+  "params": {
+    "message": {
+      "role": "user",
+      "parts": [
+        {
+          "kind": "text", 
+          "text": "Your message text here"
+        }
+      ],
+      "messageId": "unique-uuid"
+    }
+  },
+  "id": "request-id"
+}
+```
+
+The client automatically:
+- Structures text messages into the required `parts` array format
+- Sets the `role` to "user" for outgoing messages  
+- Generates unique `messageId` values using UUIDs
+- Parses responses from the `artifacts[].parts[]` structure
+- Extracts text content from agent responses
 
 ## Architecture
 
@@ -137,6 +168,8 @@ kagenti_a2a_client/
 
 ### Data Models
 
+- **Message**: A2A message structure with role, parts, and messageId
+- **MessagePart**: Individual content parts (text, data, etc.)
 - **TaskResponse**: Agent response with status, output, and metadata
 - **ConversationTurn**: Individual conversation exchange
 - **Session**: Multi-turn conversation context
@@ -161,11 +194,11 @@ SyncClient(
 
 #### Methods
 
-- `send_message(message, session_id=None, output_mode="text")` - Send message to agent
+- `send_message(message, session_id=None, **kwargs)` - Send message to agent using Kagenti A2A format
 - `create_session(session_id=None, metadata=None)` - Create new conversation session
 - `get_conversation_history(session_id, max_turns=None)` - Get conversation history
 - `close_session(session_id)` - Close conversation session
-- `health_check()` - Check agent health status
+- `health_check()` - Check agent connectivity (HTTP-based)
 - `list_sessions()` - List active session IDs
 
 ## Error Handling
